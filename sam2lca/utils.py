@@ -129,6 +129,37 @@ def taxid_to_lineage_single(taxid_items, taxid_info_dict, taxo_db):
         "lineage_taxid": taxid_lineage,
     }
 
+def lineage_dict_to_string(lineage_dict):
+    _taxo_ranks = {
+    'strain': 't__',
+    'species' : 's__',
+    'genus' : 'g__',
+    'family' : 'f__',
+    'order' : 'o__',
+    'class' : 'c__',
+    'phylum' : 'p__',
+    'superkingdom': 'k__'
+    }
+    lineage_dict_reversed = []
+    for k in reversed(lineage_dict):
+        if k in _taxo_ranks.keys():
+            lineage_dict_reversed.append(f"{_taxo_ranks[k]}{lineage_dict[k]}")
+    _lineage_string = "|".join(lineage_dict_reversed)
+    return _lineage_string
+
+def write_mpa_like_report(data_frame, output):
+    """Write MPA-like report
+
+    Args:
+        data_frame (pandas.DataFrame): Dataframe containing taxonomic information
+    """
+    selected_df = data_frame[["lineage", "count_taxon"]]
+    with open(f"{output}_metaphlan.report", "w") as f:
+        f.write("#mpa_v3\n#clade_name\tNCBI_tax_id\trelative_abundance\tadditional_species\n")
+        for index, row in selected_df.iterrows():
+            if len(row["lineage"]) > 1 and row['count_taxon'] != 0:
+                f.write(f"{row['lineage']}\t{index}\t{row['count_taxon']}\t")
+                f.write("\n")
 
 def taxid_to_lineage(taxid_count_dict, output, process, nb_steps, taxo_db):
     logging.info(
@@ -159,15 +190,22 @@ def taxid_to_lineage(taxid_count_dict, output, process, nb_steps, taxo_db):
     )
 
     df = pd.DataFrame(taxid_info_dict).transpose()
-    df["lineage"] = (
-        df["lineage"]
-        .astype(str)
-        .str.replace("[\[\]\{\}]", "")
-        .str.replace(", ", " || ")
-        .str.replace("'", "")
-    )
+    df["lineage"] = df["lineage"].map(lineage_dict_to_string)
+    # df["lineage"] = (
+    #     df["lineage"]
+    #     .astype('string')
+    #     .str.replace("[\[\]\{\}]", "")
+    #     .str.replace(", ", " || ")
+    #     .str.replace("'", "")
+    # )
+    
+    # logging.info(df["lineage"].to_string())
+
     df.sort_values("count_descendant", inplace=True, ascending=False)
     df.to_csv(f"{output}.csv", index_label="TAXID")
+    
+    # Write metaphlan format
+    write_mpa_like_report(df, output)
 
     with open(f"{output}.json", "w") as write_file:
         json.dump(taxid_info_dict, write_file)

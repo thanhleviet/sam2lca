@@ -116,6 +116,9 @@ class Alignment:
                 mismatch = read.get_tag("NM")
                 alnLen = read.query_alignment_length
                 readLen = read.query_length
+                if readLen == 0:
+                    readLen = read.infer_read_length()
+                # logging.info(f"Read: {read.query_name} - {readLen} - {alnLen} - {mismatch}")
                 if edit_distance:
                     threshold = edit_distance
                     align_value = mismatch
